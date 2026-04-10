@@ -36,13 +36,17 @@ You receive: the task, the file tree, which files the agent read, and its answer
 - **Missing folders**: Relevant folders in the tree the agent never explored?
 - **Shallow search**: Only checked one file when multiple exist?
 - **Wrong location**: Looked in the wrong place? (e.g., Telegram data in docs/channels/, not accounts/)
-- **Counting via search**: The search tool is LIMITED to 20 results. If the agent used search \
-to count items, it MUST have also READ the full file. Search alone cannot give accurate counts.
+- **Counting tasks**: CRITICAL — if the task asks "how many" or "count", the agent MUST have \
+READ the full relevant file (not just searched it). The search tool returns max 20 results \
+and CANNOT be used for accurate counting. If you see a counting task and the agent only \
+used search but did not fully read the data file, flag INCOMPLETE with: \
+"Read the full file to count accurately — search is limited to 20 results."
 
 ## Rules:
 - Only flag INCOMPLETE if you see a SPECIFIC missing folder or file.
 - Be brief: "Read docs/channels/Telegram.txt fully instead of searching" not "explore more".
 - If exploration looks reasonable for the task, say COMPLETE.
+- For counting tasks, ALWAYS check that the agent read the full data file.
 
 Respond with EXACTLY:
 VERDICT: COMPLETE or INCOMPLETE

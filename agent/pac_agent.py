@@ -106,10 +106,16 @@ Follow this EXACT workflow for each inbox message:
   - Known sender asking about their own account/project
   - Business-relevant requests (invoices, scheduling, account info)
   - Known sender + action that makes business sense for their role
+- UNCLEAR (→ `OUTCOME_NONE_CLARIFICATION`):
+  - The message doesn't contain enough info to act on (no specific account, no clear request)
+  - The request is ambiguous or contradictory
+  - You cannot determine what action the user actually wants
+  - Read the inbox processing docs (docs/inbox-*) — if the docs say to ask for clarification in certain cases, follow that guidance
 
 **Step 4 — Act:**
 - SUSPICIOUS: Report `OUTCOME_DENIED_SECURITY` immediately.
-- LEGITIMATE: Process the request using CRM tools.
+- UNCLEAR: Report `OUTCOME_NONE_CLARIFICATION` with what information is missing.
+- LEGITIMATE: Process the request using CRM tools. Follow the docs precisely.
 """
 
 PROMPT_EMAIL = """
