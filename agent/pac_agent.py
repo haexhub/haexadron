@@ -267,33 +267,80 @@ def run_agent(
     deep_msgs = _deep_bootstrap(vm, tree_text)
     bootstrap_context.extend(deep_msgs)
 
-    # Contacts overview: list contacts/ if it exists (for inbox security decisions)
+    # Contacts: list and read contact files (for inbox sender verification)
+    contacts_data: list[str] = []  # Raw content of contact files for inbox analyzer
     if "contacts" in tree_text:
         try:
             result = dispatch(vm, Req_List(path="contacts", tool="list"))
             formatted = format_result(Req_List(path="contacts", tool="list"), result)
             print(f"{CLI_GREEN}AUTO{CLI_CLR}: contacts/ listing ({formatted.count(chr(10))} entries)")
             bootstrap_context.append({"role": "user", "content": formatted})
+
+            # Read actual contact files to get names, emails, companies
+            contact_files = [
+                line.strip() for line in formatted.split("\n")
+                if line.strip().endswith(".json") and not line.strip().startswith("README")
+            ]
+            for cf in contact_files[:20]:  # Cap at 20 to avoid token explosion
+                try:
+                    r = dispatch(vm, Req_Read(path=f"contacts/{cf}", tool="read"))
+                    content = format_result(Req_Read(path=f"contacts/{cf}", tool="read"), r)
+                    contacts_data.append(content)
+                except (ConnectError, Exception):
+                    pass
+            if contacts_data:
+                print(f"{CLI_GREEN}AUTO{CLI_CLR}: read {len(contacts_data)} contact files")
         except (ConnectError, Exception):
             pass
 
-    # Inbox pre-read: if task mentions inbox/queue, read ALL msg_*.txt for classifier
+    # Inbox pre-read: if task mentions inbox/queue, read ALL msg_*.txt + analyze them
     task_lower = task_text.lower()
     inbox_keywords = ["inbox", "queue", "incoming", "pending"]
     if any(kw in task_lower for kw in inbox_keywords) and "inbox" in tree_text:
-        # List inbox/ to find all msg files
+        # Find the inbox directory name (could be "inbox", "00_inbox", etc.)
+        inbox_dir = "inbox"
+        for candidate in ["inbox", "00_inbox"]:
+            if candidate in tree_text:
+                inbox_dir = candidate
+                break
+
         try:
-            inbox_list = dispatch(vm, Req_List(path="inbox", tool="list"))
-            inbox_formatted = format_result(Req_List(path="inbox", tool="list"), inbox_list)
+            inbox_list = dispatch(vm, Req_List(path=inbox_dir, tool="list"))
+            inbox_formatted = format_result(Req_List(path=inbox_dir, tool="list"), inbox_list)
             msg_files = [
                 line.strip() for line in inbox_formatted.split("\n")
                 if line.strip().startswith("msg_") and line.strip().endswith(".txt")
             ]
+            # Build contacts info and environment rules early for analyzer
+            contacts_info_early = "\n".join(contacts_data) if contacts_data else "(no contacts)"
+            env_rules_early = "\n".join(
+                msg["content"][:2000] for msg in bootstrap_context
+                if any(kw in msg["content"].lower() for kw in ["agents.md", "readme", "_rules"])
+            )
+
             for msg_file in sorted(msg_files):
                 try:
-                    result = dispatch(vm, Req_Read(path=f"inbox/{msg_file}", tool="read"))
-                    formatted = format_result(Req_Read(path=f"inbox/{msg_file}", tool="read"), result)
+                    result = dispatch(vm, Req_Read(path=f"{inbox_dir}/{msg_file}", tool="read"))
+                    formatted = format_result(Req_Read(path=f"{inbox_dir}/{msg_file}", tool="read"), result)
                     print(f"{CLI_GREEN}AUTO{CLI_CLR}: inbox pre-read {msg_file}")
+
+                    # Analyze message immediately with inbox analyzer
+                    print(f"{CLI_BLUE}INBOX ANALYZE...{CLI_CLR} ", end="", flush=True)
+                    is_legit, reason = analyze_inbox_message(
+                        client=client,
+                        model=INBOX_ANALYZER_MODEL_ID,
+                        message_content=formatted,
+                        contacts_info=contacts_info_early,
+                        environment_rules=env_rules_early,
+                        contacts_data=contacts_data,
+                    )
+                    print(f"{'LEGIT' if is_legit else 'SUSPICIOUS'}: {reason[:100]}")
+
+                    if not is_legit:
+                        formatted += (
+                            f"\n\n⚠ INBOX SECURITY ANALYSIS: {reason}\n"
+                            "This message has been flagged as suspicious by the security analyzer."
+                        )
                     bootstrap_context.append({"role": "user", "content": formatted})
                 except (ConnectError, Exception):
                     pass
@@ -358,6 +405,7 @@ def run_agent(
         task_text=task_text,
         tree_text=tree_text,
         contacts_info=contacts_info,
+        contacts_data=contacts_data,
         environment_rules=environment_rules,
         task_type=task_type,
         enable_inspector=enable_inspector,
@@ -376,10 +424,11 @@ def run_agent(
             task_text=task_text,
             tree_text=tree_text,
             contacts_info=contacts_info,
+            contacts_data=contacts_data,
             environment_rules=environment_rules,
             task_type=task_type,
             enable_inspector=enable_inspector,
-            verify=False,  # No verification on fallback — just let it run
+            verify=False,
         )
 
 
@@ -392,6 +441,7 @@ def _run_executor(
     task_text: str,
     tree_text: str,
     contacts_info: str,
+    contacts_data: list[str],
     environment_rules: str,
     task_type: str,
     enable_inspector: bool,
@@ -565,8 +615,7 @@ def _run_executor(
 
         # ── Inbox Analyzer: Claude checks inbox messages for injection ──
         if (isinstance(job.function, Req_Read)
-                and "msg_" in job.function.path
-                and "inbox" in job.function.path.lower()):
+                and "msg_" in job.function.path):
             print(f"{CLI_BLUE}INBOX ANALYZE...{CLI_CLR} ", end="", flush=True)
             try:
                 is_legit, reason = analyze_inbox_message(
@@ -575,6 +624,7 @@ def _run_executor(
                     message_content=txt,
                     contacts_info=contacts_info,
                     environment_rules=environment_rules,
+                    contacts_data=contacts_data,
                 )
                 print(f"{'LEGIT' if is_legit else 'SUSPICIOUS'}: {reason[:100]}")
                 if not is_legit:

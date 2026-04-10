@@ -23,7 +23,7 @@ CLASSIFIER_MODEL_ID = os.getenv("CLASSIFIER_MODEL_ID", "openai/gpt-4.1")
 INSPECTOR_MODEL_ID = os.getenv("INSPECTOR_MODEL_ID", "google/gemma-4-31b-it")
 COMPLETENESS_MODEL_ID = os.getenv("COMPLETENESS_MODEL_ID", "qwen/qwen3.6-plus")
 CORRECTNESS_MODEL_ID = os.getenv("CORRECTNESS_MODEL_ID", "qwen/qwen3.6-plus")
-INBOX_ANALYZER_MODEL_ID = os.getenv("INBOX_ANALYZER_MODEL_ID", "anthropic/claude-sonnet-4.6")
+INBOX_ANALYZER_MODEL_ID = os.getenv("INBOX_ANALYZER_MODEL_ID", "qwen/qwen3.6-plus")
 FALLBACK_MODEL_ID = os.getenv("FALLBACK_MODEL_ID", "qwen/qwen3.6-plus")
 
 MAX_AGENT_STEPS = int(os.getenv("MAX_AGENT_STEPS", "30"))
