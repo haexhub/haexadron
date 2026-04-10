@@ -1,0 +1,66 @@
+config_version: 5
+log_level: info
+
+token_usage:
+  enabled: true
+
+models:
+  - name: gpt-4.1-mini
+    display_name: GPT-4.1 Mini (OpenRouter)
+    use: langchain_openai:ChatOpenAI
+    model: openai/gpt-4.1-mini
+    api_key: $OPENROUTER_API_KEY
+    base_url: https://openrouter.ai/api/v1
+    request_timeout: 600.0
+    max_retries: 2
+    max_tokens: 16384
+
+  - name: gpt-4.1
+    display_name: GPT-4.1 (OpenRouter)
+    use: langchain_openai:ChatOpenAI
+    model: openai/gpt-4.1
+    api_key: $OPENROUTER_API_KEY
+    base_url: https://openrouter.ai/api/v1
+    request_timeout: 600.0
+    max_retries: 2
+    max_tokens: 16384
+
+tool_groups:
+  - name: web
+  - name: file:read
+  - name: file:write
+
+tools:
+  - name: web_search
+    group: web
+    use: deerflow.community.ddg_search.tools:web_search_tool
+    max_results: 5
+
+  - name: web_fetch
+    group: web
+    use: deerflow.community.jina_ai.tools:web_fetch_tool
+    timeout: 10
+
+  - name: ls
+    group: file:read
+    use: deerflow.sandbox.tools:ls_tool
+
+  - name: read_file
+    group: file:read
+    use: deerflow.sandbox.tools:read_file_tool
+
+  - name: write_file
+    group: file:write
+    use: deerflow.sandbox.tools:write_file_tool
+
+sandbox:
+  use: deerflow.sandbox.local:LocalSandboxProvider
+  allow_host_bash: false
+
+memory:
+  enabled: true
+  storage_path: memory.json
+
+checkpointer:
+  type: sqlite
+  connection_string: checkpoints.db

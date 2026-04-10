@@ -1,0 +1,99 @@
+services:
+  # OpenClaw Gateway — interface layer (personas, memory, channels)
+  openclaw:
+    build:
+      context: ./vendor/openclaw
+      dockerfile: Dockerfile
+    container_name: haexadron-openclaw
+    ports:
+      - "18789:18789"
+      - "18790:18790"
+    volumes:
+      - ./config/openclaw:/home/node/.openclaw
+      - openclaw-workspace:/home/node/.openclaw/workspace
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: "1"
+      TZ: Europe/Berlin
+    init: true
+    restart: unless-stopped
+    command:
+      [
+        "node",
+        "dist/index.js",
+        "gateway",
+        "--bind",
+        "lan",
+        "--port",
+        "18789",
+        "--allow-unconfigured",
+      ]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:18789/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - haexadron
+
+  # deer-flow Gateway — orchestration layer (agents, tools, pipelines)
+  deerflow-gateway:
+    build:
+      context: ./vendor/deer-flow
+      dockerfile: backend/Dockerfile
+    container_name: haexadron-deerflow-gateway
+    command: sh -c "cd backend && PYTHONPATH=. uv run uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001 --workers 2"
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./config/deerflow/config.yaml:/app/backend/config.yaml:ro
+      - ./config/deerflow/extensions_config.json:/app/backend/extensions_config.json:ro
+      - deerflow-data:/app/backend/.deer-flow
+    env_file:
+      - .env
+    environment:
+      CI: "true"
+      DEER_FLOW_HOME: /app/backend/.deer-flow
+      DEER_FLOW_CONFIG_PATH: /app/backend/config.yaml
+      DEER_FLOW_EXTENSIONS_CONFIG_PATH: /app/backend/extensions_config.json
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - haexadron
+    restart: unless-stopped
+
+  # deer-flow LangGraph Server — agent runtime
+  deerflow-langgraph:
+    build:
+      context: ./vendor/deer-flow
+      dockerfile: backend/Dockerfile
+    container_name: haexadron-deerflow-langgraph
+    command: sh -c "cd /app/backend && uv run langgraph dev --no-browser --no-reload --host 0.0.0.0 --port 2024 --n-jobs-per-worker 10"
+    ports:
+      - "2024:2024"
+    volumes:
+      - ./config/deerflow/config.yaml:/app/backend/config.yaml:ro
+      - ./config/deerflow/extensions_config.json:/app/backend/extensions_config.json:ro
+      - deerflow-data:/app/backend/.deer-flow
+    env_file:
+      - .env
+    environment:
+      CI: "true"
+      DEER_FLOW_HOME: /app/backend/.deer-flow
+      DEER_FLOW_CONFIG_PATH: /app/backend/config.yaml
+      DEER_FLOW_EXTENSIONS_CONFIG_PATH: /app/backend/extensions_config.json
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - haexadron
+    restart: unless-stopped
+
+volumes:
+  openclaw-workspace:
+  deerflow-data:
+
+networks:
+  haexadron:
+    driver: bridge
