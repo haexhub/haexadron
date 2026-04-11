@@ -111,7 +111,7 @@ def _run_single_check(
         {"role": "user", "content": user_msg},
     ]
 
-    if "gemma" in model.lower():
+    if not any(model.startswith(p) for p in ("openai/", "anthropic/")):
         resp = client.chat.completions.create(
             model=model,
             messages=messages,
@@ -154,7 +154,7 @@ def verify_completion(
             feedback="Non-OK outcome, verification skipped.",
         )
 
-    files_summary = "\n".join(f"- {f}" for f in files_read) if files_read else "(none)"
+    files_summary = "\n".join(f"- {f}" for f in (files_read or [])) if files_read else "(none)"
 
     completeness_msg = (
         f"## Task\n{task_text}\n\n"
