@@ -3,7 +3,7 @@
 A two-phase, multi-model agent for the [BitGN](https://bitgn.com) **PAC1 Personal-Assistant Competition**.
 Haexadron splits each task into an **early classification pass** and a **targeted tool-loop execution pass**, routed across different LLMs via [OpenRouter](https://openrouter.ai).
 
-> Current best on `bitgn/pac1-dev`: **53.49 %**
+> Best scores so far: **~79 %** on `bitgn/pac1-dev`, **48 %** on `bitgn/pac1-prod`.
 
 ---
 
@@ -182,9 +182,9 @@ Swap any of these to experiment with different model mixes.
 
 ## Project status
 
-- **Phase:** active development for BitGN PAC1 (competition day: April 11, 2026)
-- **Benchmark:** `bitgn/pac1-dev`
-- **Best run:** 53.49 %
+- **Phase:** active development for BitGN PAC1 (competition day: April 21, 2026)
+- **Benchmarks:** `bitgn/pac1-dev` (development) and `bitgn/pac1-prod` (evaluation)
+- **Best runs:** ~79 % on dev, 48 % on prod
 
 Open tasks and regression notes live in [docs/plans/](docs/plans/).
 
