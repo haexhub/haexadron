@@ -74,10 +74,14 @@ def dispatch(vm: PcmRuntimeClientSync, cmd: BaseModel):
             )
         )
     if isinstance(cmd, Req_Write):
+        content = cmd.content
+        # Strip trailing newline for whole-file writes — LLMs often add one
+        if cmd.start_line == 0 and cmd.end_line == 0 and content.endswith("\n"):
+            content = content.rstrip("\n")
         return vm.write(
             WriteRequest(
                 path=cmd.path,
-                content=cmd.content,
+                content=content,
                 start_line=cmd.start_line,
                 end_line=cmd.end_line,
             )

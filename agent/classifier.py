@@ -90,7 +90,9 @@ You receive:
 - Task requires real-time data, web browsing, external API calls, or capabilities the file-based agent doesn't have.
 - Example: "What's the current stock price of AAPL?"
 - EXCEPTION: If AGENTS.md defines a fallback response for any task (e.g. "respond with Not Ready"), classify as EXECUTE instead — the agent can still fulfill the task by following AGENTS.md instructions.
+- EXCEPTION: If AGENTS.md redirects to another file (e.g. "See README.MD", "check HOME.MD"), classify as EXECUTE — the agent needs to follow that redirect chain to find the correct response.
 - EXCEPTION: If the environment has a file-based system for the capability (e.g. outbox/ folder for emails, calendar/ folder for events), classify as EXECUTE — the agent can create files even if it can't "really" send emails.
+- When in doubt between EXECUTE and UNSUPPORTED, ALWAYS prefer EXECUTE — the agent can explore and determine if it's truly unsupported. A wrong UNSUPPORTED classification loses the task entirely, while EXECUTE gives the agent a chance.
 
 ## Important
 - Read the AGENTS.md content carefully — it often contains crucial context about what the task expects.

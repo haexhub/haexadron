@@ -163,8 +163,20 @@ def check_layer3_tiers(cmd: BaseModel, task_context: str = "") -> SecurityVerdic
             "clean up", "cleanup", "remove", "purge", "clear",
             "discard", "archive and remove", "delete", "start over",
         ]
+        # Inbox processing tasks implicitly require inbox file deletion
+        inbox_indicators = [
+            "inbox", "inbound", "queue", "pending message",
+            "next message", "oldest message",
+        ]
         task_lower = task_context.lower()
         task_requests_deletion = any(ind in task_lower for ind in cleanup_indicators)
+
+        # Allow delete for inbox files when task is about inbox processing
+        if not task_requests_deletion and isinstance(cmd, Req_Delete):
+            is_inbox_task = any(ind in task_lower for ind in inbox_indicators)
+            is_inbox_file = any(d in cmd.path for d in ["inbox", "00_inbox"])
+            if is_inbox_task and is_inbox_file:
+                task_requests_deletion = True
 
         if not task_requests_deletion:
             return SecurityVerdict(

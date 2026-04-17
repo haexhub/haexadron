@@ -34,6 +34,8 @@ from openai import OpenAI
 from agent.classifier import classify_task
 from agent.config import (
     BITGN_HOST,
+    COMPLETENESS_MODEL_ID,
+    CORRECTNESS_MODEL_ID,
     INSPECTOR_MODEL_ID,
     MAX_AGENT_STEPS,
     MODEL_ID,
@@ -321,7 +323,8 @@ def run_sandbox_agent(client: OpenAI, model: str, harness_url: str, task_text: s
             try:
                 vresult = verify_completion(
                     client=client,
-                    model=INSPECTOR_MODEL_ID,
+                    completeness_model=COMPLETENESS_MODEL_ID,
+                    correctness_model=CORRECTNESS_MODEL_ID,
                     task_text=task_text,
                     tree_text=tree_text,
                     files_read=files_read,

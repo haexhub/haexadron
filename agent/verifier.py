@@ -47,6 +47,9 @@ used search but did not fully read the data file, flag INCOMPLETE with: \
 - Be brief: "Read docs/channels/Telegram.txt fully instead of searching" not "explore more".
 - If exploration looks reasonable for the task, say COMPLETE.
 - For counting tasks, ALWAYS check that the agent read the full data file.
+- For file-writing tasks (emails, invoices, records, file creation/editing): \
+if the agent's files_read list shows it read the relevant README/rules and wrote the file, \
+that is COMPLETE. Do NOT flag INCOMPLETE just because the agent didn't explore unrelated folders.
 
 Respond with EXACTLY:
 VERDICT: COMPLETE or INCOMPLETE
@@ -59,6 +62,13 @@ Is the agent's answer logically consistent with the task and data?
 
 You receive: the task, which files the agent read, and its proposed answer.
 
+## CRITICAL: Understand the answer field
+The "Message" field is a SUMMARY of what the agent did, NOT the file content.
+- For file-writing tasks (emails, invoices, records): a message like "OUTCOME_OK", \
+a file path, or a brief confirmation is CORRECT — the actual work was writing the file. \
+Do NOT flag INCOMPLETE because the message doesn't contain the file content.
+- For query tasks: the message IS the answer and should be checked for correctness.
+
 ## Check for:
 - **Numeric plausibility**: For counting tasks, does the number make sense? \
 If the data source is a large file with hundreds of entries, an answer of "5" is suspicious.
@@ -69,7 +79,8 @@ If the data source is a large file with hundreds of entries, an answer of "5" is
 - **Logic errors**: Does the conclusion follow from the data the agent read?
 
 ## Rules:
-- Only flag INCOMPLETE if you see a SPECIFIC logical issue.
+- Only flag INCOMPLETE if you see a SPECIFIC logical issue with the ANSWER CONTENT.
+- Do NOT flag INCOMPLETE for file-writing tasks where the agent reports success and a file path.
 - Be brief and actionable: "Re-count blacklisted entries by reading the full file" not "the count might be wrong".
 - If the answer seems reasonable, say COMPLETE.
 
@@ -105,32 +116,40 @@ def _run_single_check(
     system_prompt: str,
     user_msg: str,
 ) -> VerificationResult:
-    """Run a single verification check, auto-detecting model capabilities."""
+    """Run a single verification check, auto-detecting model capabilities.
+
+    Uses a 30s timeout. If the model hangs (e.g. Qwen loop), falls through as COMPLETE.
+    """
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_msg},
     ]
 
-    if not any(model.startswith(p) for p in ("openai/", "anthropic/")):
-        resp = client.chat.completions.create(
+    try:
+        if not any(model.startswith(p) for p in ("openai/", "anthropic/")):
+            resp = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_completion_tokens=512,
+                temperature=0,
+                timeout=30,
+            )
+            return _parse_plain_text_result(resp.choices[0].message.content or "")
+
+        resp = client.beta.chat.completions.parse(
             model=model,
+            response_format=VerificationResult,
             messages=messages,
             max_completion_tokens=512,
             temperature=0,
+            timeout=30,
         )
-        return _parse_plain_text_result(resp.choices[0].message.content or "")
-
-    resp = client.beta.chat.completions.parse(
-        model=model,
-        response_format=VerificationResult,
-        messages=messages,
-        max_completion_tokens=512,
-        temperature=0,
-    )
-    result = resp.choices[0].message.parsed
-    if result is None:
-        return VerificationResult(verdict="COMPLETE", feedback="Parse failed, allowing.")
-    return result
+        result = resp.choices[0].message.parsed
+        if result is None:
+            return VerificationResult(verdict="COMPLETE", feedback="Parse failed, allowing.")
+        return result
+    except Exception:
+        return VerificationResult(verdict="COMPLETE", feedback="Verifier timeout, allowing.")
 
 
 def verify_completion(

@@ -22,8 +22,9 @@ def _supports_structured_output(model: str) -> bool:
 
 def _extract_json(text: str) -> str:
     """Extract JSON from model response, handling code fences and thinking tags."""
-    # Strip <think>...</think> blocks (Qwen 3-series chain-of-thought)
-    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+    # Strip thinking blocks (Qwen, MiMo, DeepSeek, etc.)
+    text = re.sub(r"<(?:think|thinking|reasoning|thought)>.*?</(?:think|thinking|reasoning|thought)>", "", text, flags=re.DOTALL).strip()
+    text = re.sub(r"<\|think_start\|>.*?<\|think_end\|>", "", text, flags=re.DOTALL).strip()
 
     # Try to find JSON in code fences first
     m = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
@@ -101,5 +102,6 @@ def parse_structured(
     try:
         json_str = _extract_json(raw)
         return response_format.model_validate_json(json_str)
-    except Exception:
+    except Exception as exc:
+        print(f"\x1B[33mPARSE FAIL ({model}): {exc}\nRAW: {raw[:300]}\x1B[0m")
         return None
